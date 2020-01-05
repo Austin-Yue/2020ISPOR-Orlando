@@ -1,0 +1,160 @@
+---
+title: "shiny test"
+author: "Austin YUE"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: row
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(rvest)
+library(httr)
+library(readxl)
+library(data.table)
+library(stringr)
+library(janitor)
+library(stringr)
+library(forcats)
+library(jsonlite)
+library(viridis)
+library(plotly)
+library(ggplot2)
+library(knitr)
+library(odbc)
+library(DBI)
+library(shiny)
+library(tidytext)
+library(haven)
+library(rmarkdown)
+```
+
+
+```{r load the data, include=FALSE }
+start_time <- Sys.time()
+
+con <- dbConnect(odbc::odbc(), driver = "MySQL ODBC 5.3 ANSI Driver", 
+                 database = "NHWS", uid = "austiny",               
+                 pwd = "austiny", 
+                 server = "10.176.50.61",
+                 port = 3306)
+
+query <-"Select * from num_all_US_2019 where variable IN('DPDX') or variable like 'DPSY%' or variable like 'DPRX%'"
+
+dat <- lapply(query, function(x){dbGetQuery(con, x)})
+
+arrange_and_transpose <- function(dat){
+  dat %>% arrange(zKey) %>% spread(variable, numvalue)
+}
+
+dat <- lapply(dat, arrange_and_transpose)
+
+dat <- dat[[1]]
+
+stop_time <- Sys.time()
+run_time <- stop_time - start_time
+run_time
+
+#rename variables
+dat1<- dat %>% 
+  dplyr::rename(diagnosis = DPDX,
+                rx = DPRX,
+                abilify =  DPRXAB,
+                amitriptyline =  DPRXAM,
+                aplenzin =  DPRXAP,
+                brintellix =  DPRXBNX,
+                bupropion_hcl =  DPRXBRN,
+                bupropion_hcl_sr =  DPRXBRS,
+                bupropion_xl =  DPRXBRX,
+                celexa =  DPRXCX,
+                citalopram =  DPRXCT,
+                clomipramine_hcl =  DPRXCME,
+                cymbalta =  DPRXCY,
+                duloxetine =  DPRXDU,
+                duloxetine_hcl =  DPRXDXE,
+                effexor_xr =  DPRXFX,
+                elavil =  DPRXEV,
+                emsam =  DPRXES,
+                escitalopram_oxalate =  DPRXELM,
+                fetzima =  DPRXFZA,
+                fluoxetine =  DPRXFL,
+                fluvoxamine_maleate =  DPRXFLU,
+                lamictal =  DPRXLI,
+                lexapro =  DPRXLX,
+                oleptro =  DPRXOPO,
+                paroxetine =  DPRXPT,
+                paxil =  DPRXPX,
+                paxil_cr =  DPRXPC,
+                pexeva =  DPRXPXV,
+                pristiq =  DPRXPQ,
+                prozac =  DPRXPZ,
+                remeron =  DPRXRM,
+                seroquel =  DPRXSQ,
+                seroquel_xr =  DPRXSX,
+                sertraline =  DPRXSL,
+                symbyax =  DPRXSY,
+                trazodone =  DPRXTZ,
+                venlafaxine =  DPRXVE,
+                venlafaxine_hcl_er =  DPRXVEX,
+                viibryd_ =  DPRXVI,
+                wellbutrin =  DPRXWL,
+                wellbutrin_xl =  DPRXWLX,
+                zoloft =  DPRXZL,
+                zyprexa =  DPRXZY,
+                rexulti =  DPRXREX,
+                savella =  DPRXSA,
+                other =  DPRXOT,
+                abilify_mycite =  DPRXAT,
+                desvenlafaxine =  DPRXDV,
+                quetiapine_fumarate =  DPRXQF,
+                depressed_mood = DPSYAX,
+                eating         = DPSYWG,
+                sleep          = DPSYSD,
+                mental         = DPSYMC,
+                social         = DPSYSP,
+                physical       = DPSYPN) %>% 
+  select(- DPSY_MAR_S1 , - DPSY_ORALFRQ, - DPSYNON)
+
+#create 'number of symptoms' variable|wide data
+dat2 <- dat1 %>% 
+  mutate(sym_num = depressed_mood + eating + sleep + mental + social + physical)
+  
+#long data
+dat3 <- dat2 %>% pivot_longer(., depressed_mood:eating, names_to = 'symptoms', values_to = 'sym_status') %>% filter(sym_num %in% c(1,2,3))
+
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+# number <- dat3 %>% 
+#  distinct(sym_num) %>% 
+#  pull()
+
+
+number <- c(1:3)
+# selectInput widget
+selectInput("symptoms_number", label = h3("Select the number of relative symptoms the patient has"),
+            choices = number, selected = "1")
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### The frequency for symptoms
+
+```{r}
+renderPlotly({
+dat3 %>% 
+  filter(sym_num == input$symptoms_number) %>% 
+  filter(sym_status == 1) %>% 
+  count(symptoms, sort = TRUE) %>% 
+  mutate(symptoms = fct_reorder(symptoms, n)) %>% 
+  plot_ly(x = ~ symptoms, y = ~n, type = "bar", color = ~ symptoms)
+  
+})
+```
