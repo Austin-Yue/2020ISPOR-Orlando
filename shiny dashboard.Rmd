@@ -29,12 +29,11 @@ library(shiny)
 library(tidytext)
 library(haven)
 library(rmarkdown)
+library(rsconnect)
 ```
 
 
 ```{r load the data, include=FALSE }
-start_time <- Sys.time()
-
 con <- dbConnect(odbc::odbc(), driver = "MySQL ODBC 5.3 ANSI Driver", 
                  database = "NHWS", uid = "austiny",               
                  pwd = "austiny", 
@@ -52,10 +51,6 @@ arrange_and_transpose <- function(dat){
 dat <- lapply(dat, arrange_and_transpose)
 
 dat <- dat[[1]]
-
-stop_time <- Sys.time()
-run_time <- stop_time - start_time
-run_time
 
 #rename variables
 dat1<- dat %>% 
@@ -124,6 +119,8 @@ dat2 <- dat1 %>%
 #long data
 dat3 <- dat2 %>% pivot_longer(., depressed_mood:eating, names_to = 'symptoms', values_to = 'sym_status') %>% filter(sym_num %in% c(1,2,3))
 
+number <- c(1:3)
+
 ```
 
 Column {.sidebar}
@@ -134,8 +131,6 @@ Column {.sidebar}
 #  distinct(sym_num) %>% 
 #  pull()
 
-
-number <- c(1:3)
 # selectInput widget
 selectInput("symptoms_number", label = h3("Select the number of relative symptoms the patient has"),
             choices = number, selected = "1")
